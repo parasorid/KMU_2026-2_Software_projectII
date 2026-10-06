@@ -28,40 +28,43 @@ void setup() {
 }
 
 void loop() { 
-  float distance;
-  int distance_value;
+  static float distance;
+  static int distance_value = 255;
   // wait until next sampling time. // polling
   // millis() returns the number of milliseconds since the program started.
   //    will overflow after 50 days.
-  if (millis() < (last_sampling_time + INTERVAL))
-    return;
+  if (millis() >= (last_sampling_time + INTERVAL)) {
+    distance = USS_measure(PIN_TRIG, PIN_ECHO); // read distance
 
-  distance = USS_measure(PIN_TRIG, PIN_ECHO); // read distance
+    if ((distance == 0.0) || (distance > _DIST_MAX)) {
+        distance = _DIST_MAX + 10.0;    // Set Higher Value
+        distance_value = 255;           // LED OFF
+    } else if (distance < _DIST_MIN) {
+        distance = _DIST_MIN - 10.0;    // Set Lower Value
+        distance_value = 255;           // LED OFF
+    } else {    // In desired Range
+        distance_value = abs(distance - 200.0) / 100.0 * 255.0;
+        Serial.println(distance_value);
+    }
 
-  if ((distance == 0.0) || (distance > _DIST_MAX)) {
-      distance = _DIST_MAX + 10.0;    // Set Higher Value
-      analogWrite(PIN_LED, 255);       // LED OFF
-  } else if (distance < _DIST_MIN) {
-      distance = _DIST_MIN - 10.0;    // Set Lower Value
-      analogWrite(PIN_LED, 255);       // LED OFF
-  } else {    // In desired Range
-      distance_value = abs(distance - 200) / 100 *255;
-      Serial.println(distance_value);
-      
-      analogWrite(PIN_LED, distance_value);       // LED ON      
+    // output the distance to the serial port
+    Serial.print("Min:");        Serial.print(_DIST_MIN);
+    Serial.print(",distance:");  Serial.print(distance);
+    Serial.print(",Max:");       Serial.print(_DIST_MAX);
+    Serial.println("");
+    
+    // do something here
+    // delay(50); // Assume that it takes 50ms to do something.
+    
+    // update last sampling time
+    last_sampling_time += INTERVAL;
   }
 
-  // output the distance to the serial port
-  Serial.print("Min:");        Serial.print(_DIST_MIN);
-  Serial.print(",distance:");  Serial.print(distance);
-  Serial.print(",Max:");       Serial.print(_DIST_MAX);
-  Serial.println("");
-  
-  // do something here
-  // delay(50); // Assume that it takes 50ms to do something.
-  
-  // update last sampling time
-  last_sampling_time += INTERVAL;
+  if ((micros() % 1000) < ((unsigned long)distance_value * 1000 / 255)) {
+      digitalWrite(PIN_LED, 1);       // LED OFF      
+  } else {
+      digitalWrite(PIN_LED, 0);       // LED ON      
+  }
 }
 
 // get a distance reading from USS. return value is in millimeter.
@@ -76,7 +79,7 @@ float USS_measure(int TRIG, int ECHO)
   // Pulse duration to distance conversion example (target distance = 17.3m)
   // - pulseIn(ECHO, HIGH, timeout) returns microseconds (음파의 왕복 시간)
   // - 편도 거리 = (pulseIn() / 1,000,000) * SND_VEL / 2 (미터 단위)
-  //   mm 단위로 하려면 * 1,000이 필요 ==>  SCALE = 0.001 * 0.5 * SND_VEL
+  //    mm 단위로 하려면 * 1,000이 필요 ==>  SCALE = 0.001 * 0.5 * SND_VEL
   //
   // - 예, pusseIn()이 100,000 이면 (= 0.1초, 왕복 거리 34.6m)
   //        = 100,000 micro*sec * 0.001 milli/micro * 0.5 * 346 meter/sec
